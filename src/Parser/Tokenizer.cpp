@@ -16,14 +16,14 @@ namespace SP
     "else"
   };
 
-  std::string Tokenizer::Token::ToString() const
+  std::string Token::ToString() const
   {
 #define TYPETOSTRING(TYPE) return std::string(#TYPE);
     TYPETOSTRING(type);
 #undef TYPETOSTRING
   }
 
-  bool Tokenizer::Token::operator==(const Token& rhs) const
+  bool Token::operator==(const Token& rhs) const
   {
     return type == rhs.type && value == rhs.value;
   }
@@ -33,8 +33,8 @@ namespace SP
     current = std::find_if_not(current, end, isspace);
   }
 
-  std::optional<Tokenizer::Token> Tokenizer::parseToken(Tokenizer::StrIterator& current,
-                                                        Tokenizer::StrIterator& end)
+  std::optional<Token> Tokenizer::parseToken(Tokenizer::StrIterator& current,
+                                                        Tokenizer::StrIterator& end) const
   {
     skipSpaces(current, end);
     if (current == end)
@@ -100,7 +100,7 @@ namespace SP
   }
 
 
-  std::vector<Tokenizer::Token> Tokenizer::Tokenize(const std::string& loc)
+  std::vector<Token> Tokenizer::Tokenize(const std::string& loc) const
   {
     auto curr = loc.data();
     auto end = loc.data()+loc.size();

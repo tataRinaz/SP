@@ -1,11 +1,11 @@
 #define CATCH_CONFIG_MAIN
 
 #include "catch2/catch.hpp"
-#include "Tokenizer/Tokenizer.hpp"
+#include "Parser/Tokenizer.hpp"
 
 TEST_CASE("Basic string", "Tokenizer")
 {
-  using Token = SP::Tokenizer::Token;
+  using Token = SP::Token;
   std::string loc = "1+1";
   std::vector<Token> expectedResult = {
     Token{Token::TokenType::number, 1. },
@@ -15,3 +15,5 @@ TEST_CASE("Basic string", "Tokenizer")
   SP::Tokenizer t;
   REQUIRE(t.Tokenize(loc) == expectedResult);
 }
+
+
