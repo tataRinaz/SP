@@ -1,4 +1,5 @@
 /target
 **/*.rs.bk
-history.txt
-Cargo.lock
+/history.txt
+/.vscode
+/Cargo.lock
