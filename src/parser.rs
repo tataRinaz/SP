@@ -1,4 +1,4 @@
-use crate::node::{Function, Node, Operation};
+use crate::node::{Function, Node, Operation, Value};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take, take_while, take_while1};
 use nom::character::is_alphabetic;
@@ -20,11 +20,25 @@ fn variable(input: &[u8]) -> IResult<&[u8], Node> {
 }
 
 fn number(input: &[u8]) -> IResult<&[u8], Node> {
-    map(float, Node::Constant)(input)
+    map(float, |num: f32| Node::Constant(Value::Number(num)))(input)
 }
 
 fn operation(input: &[u8]) -> IResult<&[u8], Operation> {
-    map_res(take(1usize), |c: &[u8]| Operation::from_char(c[0] as char))(input)
+    map(
+        alt((
+            tag("||"),
+            tag("&&"),
+            tag("=="),
+            tag("!="),
+            tag("+"),
+            tag("-"),
+            tag("/"),
+            tag("*"),
+            tag(">"),
+            tag("<"),
+        )),
+        |c: &[u8]| Operation::from_string(std::str::from_utf8(c).unwrap()).unwrap(),
+    )(input)
 }
 
 fn plus_minus_oper(input: &[u8]) -> IResult<&[u8], Operation> {
@@ -73,7 +87,7 @@ fn factor(input: &[u8]) -> IResult<&[u8], Node> {
             input,
             Node::BinaryOperation(
                 Operation::Minus,
-                Box::new(Node::Constant(0.0)),
+                Box::new(Node::Constant(Value::Number(0.0))),
                 Box::new(expression),
             ),
         ))
@@ -216,13 +230,14 @@ fn assignment(input: &[u8]) -> IResult<&[u8], Node> {
 #[cfg(test)]
 
 mod tests {
-    use crate::node::Context;
+    use crate::node::{Context, Value};
     use crate::parser::statement;
     fn eval(e: &str) -> Result<f32, Box<dyn std::error::Error>> {
         let (_, parsed) = statement(e.as_bytes()).map_err(|err| format!("{:?}", err))?;
 
         let mut context = Context::default();
-        parsed.evaluate(&mut context).map(Option::unwrap)
+        let value = parsed.evaluate(&mut context).unwrap();
+        Ok(value.to_number().unwrap())
     }
     #[test]
     fn basic_expression() {
