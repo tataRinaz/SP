@@ -65,6 +65,19 @@ fn div_multi_oper(input: &[u8]) -> IResult<&[u8], Operation> {
     }
 }
 
+fn logic_oper(input: &[u8]) -> IResult<&[u8], Operation> {
+    let (input, operation) = operation(input)?;
+    if (operation == Operation::NotEqual) || (operation == Operation::Equal) || (operation == Operation::Or) || (operation == Operation::And) 
+    || (operation == Operation::Less)|| (operation == Operation::More){
+        Ok((&input, operation))
+    } else {
+        Err(nom::Err::Error(error_position!(
+            input,
+            nom::error::ErrorKind::MapRes
+        )))
+    }
+}
+
 fn brackets_expression(input: &[u8]) -> IResult<&[u8], Node> {
     let (input, _) = tag("(")(input)?;
     let (input, expr) = map(tuple((space, expression, space)), |(_, expr, _)| expr)(input)?;
@@ -96,8 +109,22 @@ fn factor(input: &[u8]) -> IResult<&[u8], Node> {
     }
 }
 
-fn term(input: &[u8]) -> IResult<&[u8], Node> {
+fn logic(input: &[u8]) -> IResult<&[u8], Node> {
     let (input, left) = factor(input)?;
+    let (input, _) = space(input)?;
+    if let Ok((input, operation)) = logic_oper(input) {
+        let (input, right) = logic(input)?;
+        Ok((
+            input,
+            Node::BinaryOperation(operation, Box::new(left), Box::new(right)),
+        ))
+    } else {
+        Ok((input, left))
+    }
+}
+
+fn term(input: &[u8]) -> IResult<&[u8], Node> {
+    let (input, left) = logic(input)?;
     let (input, _) = space(input)?;
     if let Ok((input, operation)) = div_multi_oper(input) {
         let (input, right) = term(input)?;
@@ -157,8 +184,17 @@ fn function(input: &[u8]) -> IResult<&[u8], Node> {
     let (input, body) = body(input)?;
     let (input, _) = space(input)?;
     let (input, _) = tag("}")(input)?;
-
-    Ok((input, Node::Function(name, Function { parameters, body })))
+    let boxed_body = Box::new(Node::Block(body));
+    Ok((
+        input,
+        Node::Function(
+            name,
+            Function {
+                parameters,
+                body: boxed_body,
+            },
+        ),
+    ))
 }
 
 fn body(input: &[u8]) -> IResult<&[u8], Vec<Node>> {
@@ -198,26 +234,60 @@ fn call(input: &[u8]) -> IResult<&[u8], Node> {
     let (input, _) = tag(")")(input)?;
     Ok((input, Node::Call(name, parameters)))
 }
+
+fn else_block(input: &[u8]) -> IResult<&[u8], Option<Box<Node>>> {
+    let (input, _) = space(input)?;
+    let (input, opt_else) = opt(tag("else"))(input)?;
+    if opt_else.is_none() {
+        Ok((input, None))
+    }
+    else {
+        let (input, _) = space(input)?;
+        let (input, body) = body(input)?;
+        let boxed_body = Box::new(Node::Block(body));
+        let (input, _) = space(input)?;
+        let (input, _) = tag("}")(input)?;
+        Ok((input, Some(boxed_body)))
+    }
+}
+
+fn if_else(input: &[u8]) -> IResult<&[u8], Node> {
+    let (input, _) = space(input)?;
+    let (input, _) = tag("if")(input)?;
+    let (input, _) = space(input)?;
+    let (input, condition) = expression(input)?;
+    let (input, _) = space(input)?;
+
+    let (input, if_body) = body(input)?;
+    let (input, _) = space(input)?;
+    let (input, _) = tag("}")(input)?;
+    let boxed_body = Box::new(Node::Block(if_body));
+    let (input, else_body) = else_block(input)?;
+    
+    Ok ((input, Node::IfElse(Box::new(condition), boxed_body, else_body)))
+}
 // Backus-Naur Form of math expression
 //
-// Statement ::= Function | Assignment | Expr
+// Statement ::=  Function| IfElse | Assignment | Expr
 //
 // Function ::= "fn" Var '(' [Var (',' Var)*]')' Body
 // Body ::= '{' (Statement ';')* '}'
 // Call ::= Var '(' [Expr (',' Expr)*]')'
 //
+// IfElse ::= "if" Expr Body ["else" Body]
+//
 // Assignment ::= Var '=' Expr
 // Var ::= Char+
 //
 // Expr ::= Term ('+' Term | '-' Term)*
-// Term ::= Factor ('*' Factor | '/' Factor)*
-//
+// Term ::= Logic ('*' Logic | '/' Logic)*
+// Logic ::= Factor ('>' Factor | '<' Factor | '==' Factor | '!=' Factor | '||' Factor | '&&' Factor)*
 // Factor ::= ['-'] (Number | Call | '(' Expr ')')
 //
 // Number ::= Digit+
 
 pub fn statement(input: &[u8]) -> IResult<&[u8], Node> {
-    alt((function, assignment, expression))(input)
+    alt((function, if_else, assignment, expression))(input)
 }
 
 fn assignment(input: &[u8]) -> IResult<&[u8], Node> {

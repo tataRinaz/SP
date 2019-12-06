@@ -115,15 +115,21 @@ pub enum Node {
     Constant(Value),
     BinaryOperation(Operation, Box<Node>, Box<Node>),
     Variable(String),
+    Block(Vec<Node>),
     Assignment(String, Box<Node>),
     Function(String, Function),
     Call(String, Vec<Node>),
+    IfElse(
+        Box<Node>,         /* condition */
+        Box<Node>,         /* if true */
+        Option<Box<Node>>, /* if false */
+    ),
 }
 
 #[derive(Debug, Clone)]
 pub struct Function {
     pub parameters: Vec<String>,
-    pub body: Vec<Node>,
+    pub body: Box<Node>,
 }
 
 impl Function {
@@ -143,11 +149,7 @@ impl Function {
             context.variables.insert(name, value.unwrap());
         }
 
-        let mut value = Value::None;
-        for expression in self.body.iter() {
-            value = expression.evaluate(context)?;
-        }
-
+        let value = self.body.evaluate(context)?;
         Ok(value)
     }
 }
@@ -244,18 +246,19 @@ impl Node {
             }
             Node::Variable(name) => name.clone(),
             Node::Assignment(name, value) => name.clone() + "=" + &value.to_string(),
+            Node::Block(body) => body
+                .iter()
+                .map(|expr| "  ".to_string() + &expr.to_string())
+                .collect::<Vec<String>>()
+                .join(";\n"),
             Node::Function(name, Function { parameters, body }) => {
                 "fn ".to_string()
                     + &name
                     + "("
                     + &parameters.join(", ")
                     + ") {\n"
-                    + &body
-                        .iter()
-                        .map(|expr| "  ".to_string() + &expr.to_string())
-                        .collect::<Vec<String>>()
-                        .join(";\n")
-                    + "}"
+                    + &body.to_string()
+                    + "}\n"
             }
             Node::Call(name, params) => {
                 name.clone()
@@ -266,6 +269,19 @@ impl Node {
                         .collect::<Vec<String>>()
                         .join(", ")
                     + ")"
+            }
+            Node::IfElse(condition, if_body, else_body) => {
+                let result = "if ".to_string()
+                    + &condition.to_string()
+                    + " {\n"
+                    + &if_body.to_string()
+                    + "}\n";
+                if else_body.is_some() {
+                    let body = else_body.as_ref().unwrap();
+                    let result = result + "else {\n" + &body.to_string() + "}\n";
+                    return result;
+                }
+                result
             }
         }
     }
@@ -288,6 +304,13 @@ impl Node {
                 context.variables.insert(name.clone(), value);
                 Ok(Value::None)
             }
+            Node::Block(body) => {
+                let mut value = Value::None;
+                for expression in body.iter() {
+                    value = expression.evaluate(context)?;
+                }
+                Ok(value)
+            }
             Node::Function(name, function) => {
                 context.functions.insert(name.clone(), function.clone());
                 Ok(Value::None)
@@ -306,9 +329,22 @@ impl Node {
                             )
                             .into());
                         }
+
                         function.call(&mut context, parameters)
                     }
                     None => Err(format!("{} function is not defined", name).into()),
+                }
+            }
+            Node::IfElse(condition, if_body, else_body) => {
+                let cond_result = condition.evaluate(context)?;
+                if cond_result.is_bool() && cond_result.to_bool().unwrap() == true
+                    || cond_result.is_number() && cond_result.to_number().unwrap() == 0.0
+                {
+                    if_body.evaluate(context)
+                } else if else_body.is_some() {
+                    else_body.as_ref().unwrap().evaluate(context)
+                } else {
+                    Ok(Value::None)
                 }
             }
         }
@@ -331,6 +367,23 @@ mod tests {
     fn bin(oper: Operation, left: Node, right: Node) -> Node {
         Node::BinaryOperation(oper, Box::new(left), Box::new(right))
     }
+
+    fn ifelse(condition: Node, if_expr: Node, else_expr: Option<Node>) -> Node {
+        if else_expr.is_none() {
+            Node::IfElse(Box::new(condition), Box::new(if_expr), None)
+        } else {
+            Node::IfElse(
+                Box::new(condition),
+                Box::new(if_expr),
+                Some(Box::new(else_expr.unwrap())),
+            )
+        }
+    }
+
+    fn block(body: Vec<Node>) -> Node {
+        Node::Block(body)
+    }
+
     #[test]
     fn basic_tree() {
         //  +
@@ -378,6 +431,33 @@ mod tests {
         let mut context = Context::default();
         let value = operation.evaluate(&mut context);
         assert!(value.is_err());
-        assert_eq!(value.unwrap_err().to_string(), "Operands have different types in expression")
+        assert_eq!(
+            value.unwrap_err().to_string(),
+            "Operands have different types in expression"
+        )
+    }
+
+    #[test]
+    fn simple_if_expression() {
+        let mut context = Context::default();
+        let body = [bin(Plus, num(1.0), num(2.0))];
+        let condition = bin(Less, num(3.0), num(4.0));
+        let if_else = ifelse(condition, block(body.to_vec()), None);
+        let value = if_else.evaluate(&mut context).unwrap();
+        assert_eq!(value.to_number().unwrap(), 3.0)
+    }
+    #[test]
+    fn simple_else_expression() {
+        let mut context = Context::default();
+        let body_if = [bin(Plus, num(1.0), num(2.0))];
+        let body_else = [bin(Plus, num(3.0), num(4.0))];
+        let condition = bin(More, num(3.0), num(4.0));
+        let if_else = ifelse(
+            condition,
+            block(body_if.to_vec()),
+            Some(block(body_else.to_vec())),
+        );
+        let value = if_else.evaluate(&mut context).unwrap();
+        assert_eq!(value.to_number().unwrap(), 7.0)
     }
 }
