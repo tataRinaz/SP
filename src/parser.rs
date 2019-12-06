@@ -67,8 +67,13 @@ fn div_multi_oper(input: &[u8]) -> IResult<&[u8], Operation> {
 
 fn logic_oper(input: &[u8]) -> IResult<&[u8], Operation> {
     let (input, operation) = operation(input)?;
-    if (operation == Operation::NotEqual) || (operation == Operation::Equal) || (operation == Operation::Or) || (operation == Operation::And) 
-    || (operation == Operation::Less)|| (operation == Operation::More){
+    if (operation == Operation::NotEqual)
+        || (operation == Operation::Equal)
+        || (operation == Operation::Or)
+        || (operation == Operation::And)
+        || (operation == Operation::Less)
+        || (operation == Operation::More)
+    {
         Ok((&input, operation))
     } else {
         Err(nom::Err::Error(error_position!(
@@ -240,8 +245,7 @@ fn else_block(input: &[u8]) -> IResult<&[u8], Option<Box<Node>>> {
     let (input, opt_else) = opt(tag("else"))(input)?;
     if opt_else.is_none() {
         Ok((input, None))
-    }
-    else {
+    } else {
         let (input, _) = space(input)?;
         let (input, body) = body(input)?;
         let boxed_body = Box::new(Node::Block(body));
@@ -263,8 +267,11 @@ fn if_else(input: &[u8]) -> IResult<&[u8], Node> {
     let (input, _) = tag("}")(input)?;
     let boxed_body = Box::new(Node::Block(if_body));
     let (input, else_body) = else_block(input)?;
-    
-    Ok ((input, Node::IfElse(Box::new(condition), boxed_body, else_body)))
+
+    Ok((
+        input,
+        Node::IfElse(Box::new(condition), boxed_body, else_body),
+    ))
 }
 // Backus-Naur Form of math expression
 //
