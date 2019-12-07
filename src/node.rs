@@ -124,6 +124,10 @@ pub enum Node {
         Box<Node>,         /* if true */
         Option<Box<Node>>, /* if false */
     ),
+    While(
+        Box<Node>,         /* condition */
+        Box<Node>,         /* body */
+    ),
 }
 
 #[derive(Debug, Clone)]
@@ -202,6 +206,15 @@ fn evaluate_logical_operation(
         }
         _ => Err(format!("None as operand in logical operation").into()),
     }
+}
+
+fn evaluate_condition(
+    condition: &Box<Node>,
+    context: &mut Context,
+) -> Result<bool, Box<dyn std::error::Error>> {
+    let cond_result = condition.evaluate(context)?;
+    Ok(cond_result.is_bool() && cond_result.to_bool().unwrap() == true
+        || cond_result.is_number() && cond_result.to_number().unwrap() == 0.0)
 }
 
 fn evaluate_operation(
@@ -283,6 +296,13 @@ impl Node {
                 }
                 result
             }
+            Node::While(condition, body) => {
+                "if ".to_string()
+                    + &condition.to_string()
+                    + " {\n"
+                    + &body.to_string()
+                    + "}\n"
+            }
         }
     }
 
@@ -336,9 +356,8 @@ impl Node {
                 }
             }
             Node::IfElse(condition, if_body, else_body) => {
-                let cond_result = condition.evaluate(context)?;
-                if cond_result.is_bool() && cond_result.to_bool().unwrap() == true
-                    || cond_result.is_number() && cond_result.to_number().unwrap() == 0.0
+                let cond = evaluate_condition(condition, context)?;
+                if cond
                 {
                     if_body.evaluate(context)
                 } else if else_body.is_some() {
@@ -346,6 +365,12 @@ impl Node {
                 } else {
                     Ok(Value::None)
                 }
+            }
+            Node::While(condition, body) => {
+                while evaluate_condition(condition, context)? {
+                    body.evaluate(context)?;
+                }
+                Ok(Value::None)
             }
         }
     }

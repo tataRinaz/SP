@@ -273,15 +273,34 @@ fn if_else(input: &[u8]) -> IResult<&[u8], Node> {
         Node::IfElse(Box::new(condition), boxed_body, else_body),
     ))
 }
+
+fn while_ident(input: &[u8]) -> IResult<&[u8], Node> {
+    let (input, _) = space(input)?;
+    let (input, _) = tag("while")(input)?;
+    let (input, _) = space(input)?;
+    let (input, condition) = expression(input)?;
+    let (input, _) = space(input)?;
+
+    let (input, body) = body(input)?;
+    let (input, _) = space(input)?;
+    let (input, _) = tag("}")(input)?;
+    let boxed_body = Box::new(Node::Block(body));
+
+    Ok((
+        input,
+        Node::While(Box::new(condition), boxed_body)
+    ))
+}
 // Backus-Naur Form of math expression
 //
-// Statement ::=  Function| IfElse | Assignment | Expr
+// Statement ::=  Function| While| IfElse | Assignment | Expr
 //
 // Function ::= "fn" Var '(' [Var (',' Var)*]')' Body
 // Body ::= '{' (Statement ';')* '}'
 // Call ::= Var '(' [Expr (',' Expr)*]')'
 //
 // IfElse ::= "if" Expr Body ["else" Body]
+// While  ::= "while" Expr Body
 //
 // Assignment ::= Var '=' Expr
 // Var ::= Char+
@@ -294,7 +313,7 @@ fn if_else(input: &[u8]) -> IResult<&[u8], Node> {
 // Number ::= Digit+
 
 pub fn statement(input: &[u8]) -> IResult<&[u8], Node> {
-    alt((function, if_else, assignment, expression))(input)
+    alt((function, while_ident, if_else, assignment, expression))(input)
 }
 
 fn assignment(input: &[u8]) -> IResult<&[u8], Node> {
