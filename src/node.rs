@@ -128,6 +128,12 @@ pub enum Node {
         Box<Node>,         /* condition */
         Box<Node>,         /* body */
     ),
+    For(
+        Box<Node>,          /* init */
+        Box<Node>,          /* condition */
+        Box<Node>,          /* body */
+        Box<Node>,          /* step */
+    )
 }
 
 #[derive(Debug, Clone)]
@@ -297,11 +303,22 @@ impl Node {
                 result
             }
             Node::While(condition, body) => {
-                "if ".to_string()
+                "while ".to_string()
                     + &condition.to_string()
                     + " {\n"
                     + &body.to_string()
                     + "}\n"
+            }
+            Node::For(init, condition, body, step) => {
+                "for ".to_string()
+                + &init.to_string()
+                + "; "
+                + &condition.to_string()
+                + "; "
+                + &step.to_string()
+                + " {\n"
+                + &body.to_string()
+                + "}\n"
             }
         }
     }
@@ -369,6 +386,14 @@ impl Node {
             Node::While(condition, body) => {
                 while evaluate_condition(condition, context)? {
                     body.evaluate(context)?;
+                }
+                Ok(Value::None)
+            }
+            Node::For(init, condition, body, step) => {
+                init.evaluate(context);
+                while evaluate_condition(condition, context)? {
+                    body.evaluate(context)?;
+                    step.evaluate(context)?;
                 }
                 Ok(Value::None)
             }
