@@ -124,16 +124,13 @@ pub enum Node {
         Box<Node>,         /* if true */
         Option<Box<Node>>, /* if false */
     ),
-    While(
-        Box<Node>,         /* condition */
-        Box<Node>,         /* body */
-    ),
+    While(Box<Node> /* condition */, Box<Node> /* body */),
     For(
-        Box<Node>,          /* init */
-        Box<Node>,          /* condition */
-        Box<Node>,          /* body */
-        Box<Node>,          /* step */
-    )
+        Box<Node>, /* init */
+        Box<Node>, /* condition */
+        Box<Node>, /* body */
+        Box<Node>, /* step */
+    ),
 }
 
 #[derive(Debug, Clone)]
@@ -219,8 +216,10 @@ fn evaluate_condition(
     context: &mut Context,
 ) -> Result<bool, Box<dyn std::error::Error>> {
     let cond_result = condition.evaluate(context)?;
-    Ok(cond_result.is_bool() && cond_result.to_bool().unwrap() == true
-        || cond_result.is_number() && cond_result.to_number().unwrap() == 0.0)
+    Ok(
+        cond_result.is_bool() && cond_result.to_bool().unwrap() == true
+            || cond_result.is_number() && cond_result.to_number().unwrap() == 0.0,
+    )
 }
 
 fn evaluate_operation(
@@ -303,22 +302,18 @@ impl Node {
                 result
             }
             Node::While(condition, body) => {
-                "while ".to_string()
-                    + &condition.to_string()
-                    + " {\n"
-                    + &body.to_string()
-                    + "}\n"
+                "while ".to_string() + &condition.to_string() + " {\n" + &body.to_string() + "}\n"
             }
             Node::For(init, condition, body, step) => {
                 "for ".to_string()
-                + &init.to_string()
-                + "; "
-                + &condition.to_string()
-                + "; "
-                + &step.to_string()
-                + " {\n"
-                + &body.to_string()
-                + "}\n"
+                    + &init.to_string()
+                    + "; "
+                    + &condition.to_string()
+                    + "; "
+                    + &step.to_string()
+                    + " {\n"
+                    + &body.to_string()
+                    + "}\n"
             }
         }
     }
@@ -374,8 +369,7 @@ impl Node {
             }
             Node::IfElse(condition, if_body, else_body) => {
                 let cond = evaluate_condition(condition, context)?;
-                if cond
-                {
+                if cond {
                     if_body.evaluate(context)
                 } else if else_body.is_some() {
                     else_body.as_ref().unwrap().evaluate(context)

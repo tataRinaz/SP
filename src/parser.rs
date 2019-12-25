@@ -84,9 +84,9 @@ fn logic_oper(input: &[u8]) -> IResult<&[u8], Operation> {
 }
 
 fn brackets_expression(input: &[u8]) -> IResult<&[u8], Node> {
-    let (input, _) = tag("(")(input)?;
+    let (input, _) = skip_tag(input, "(".to_string())?;
     let (input, expr) = map(tuple((space, expression, space)), |(_, expr, _)| expr)(input)?;
-    let (input, _) = tag(")")(input)?;
+    let (input, _) = skip_tag(input, ")".to_string())?;
     Ok((input, expr))
 }
 
@@ -162,13 +162,10 @@ fn space(input: &[u8]) -> IResult<&[u8], &[u8]> {
 }
 
 fn function(input: &[u8]) -> IResult<&[u8], Node> {
-    let (input, _) = space(input)?;
-    let (input, _) = tag("fn")(input)?;
-    let (input, _) = space(input)?;
+    let (input, _) = skip_tag(input, "fn".to_string())?;
     let (input, name) = identifier(input)?;
-    let (input, _) = space(input)?;
-    let (input, _) = tag("(")(input)?;
-    let (input, _) = space(input)?;
+
+    let (input, _) = skip_tag(input, "(".to_string())?;
 
     let (input, parameters) = if let Ok((input, param)) = identifier(input) {
         fold_many0(
@@ -182,13 +179,10 @@ fn function(input: &[u8]) -> IResult<&[u8], Node> {
     } else {
         (input, Vec::new())
     };
-    let (input, _) = space(input)?;
-    let (input, _) = tag(")")(input)?;
-    let (input, _) = space(input)?;
+    let (input, _) = skip_tag(input, ")".to_string())?;
 
     let (input, body) = body(input)?;
-    let (input, _) = space(input)?;
-    let (input, _) = tag("}")(input)?;
+    let (input, _) = skip_tag(input, "}".to_string())?;
     let boxed_body = Box::new(Node::Block(body));
     Ok((
         input,
@@ -218,9 +212,7 @@ fn body(input: &[u8]) -> IResult<&[u8], Vec<Node>> {
 fn call(input: &[u8]) -> IResult<&[u8], Node> {
     let (input, _) = space(input)?;
     let (input, name) = identifier(input)?;
-    let (input, _) = space(input)?;
-    let (input, _) = tag("(")(input)?;
-    let (input, _) = space(input)?;
+    let (input, _) = skip_tag(input, "(".to_string())?;
 
     let (input, parameters) = if let Ok((input, param)) = expression(input) {
         fold_many0(
@@ -235,8 +227,7 @@ fn call(input: &[u8]) -> IResult<&[u8], Node> {
         (input, Vec::new())
     };
 
-    let (input, _) = space(input)?;
-    let (input, _) = tag(")")(input)?;
+    let (input, _) = skip_tag(input, ")".to_string())?;
     Ok((input, Node::Call(name, parameters)))
 }
 
@@ -249,22 +240,18 @@ fn else_block(input: &[u8]) -> IResult<&[u8], Option<Box<Node>>> {
         let (input, _) = space(input)?;
         let (input, body) = body(input)?;
         let boxed_body = Box::new(Node::Block(body));
-        let (input, _) = space(input)?;
-        let (input, _) = tag("}")(input)?;
+        let (input, _) = skip_tag(input, "}".to_string())?;
         Ok((input, Some(boxed_body)))
     }
 }
 
 fn if_else(input: &[u8]) -> IResult<&[u8], Node> {
-    let (input, _) = space(input)?;
-    let (input, _) = tag("if")(input)?;
-    let (input, _) = space(input)?;
+    let (input, _) = skip_tag(input, "if".to_string())?;
     let (input, condition) = expression(input)?;
     let (input, _) = space(input)?;
 
     let (input, if_body) = body(input)?;
-    let (input, _) = space(input)?;
-    let (input, _) = tag("}")(input)?;
+    let (input, _) = skip_tag(input, "}".to_string())?;
     let boxed_body = Box::new(Node::Block(if_body));
     let (input, else_body) = else_block(input)?;
 
@@ -275,46 +262,45 @@ fn if_else(input: &[u8]) -> IResult<&[u8], Node> {
 }
 
 fn while_ident(input: &[u8]) -> IResult<&[u8], Node> {
-    let (input, _) = space(input)?;
-    let (input, _) = tag("while")(input)?;
-    let (input, _) = space(input)?;
+    let (input, _) = skip_tag(input, "while".to_string())?;
     let (input, condition) = expression(input)?;
     let (input, _) = space(input)?;
 
     let (input, body) = body(input)?;
-    let (input, _) = space(input)?;
-    let (input, _) = tag("}")(input)?;
+    let (input, _) = skip_tag(input, "}".to_string())?;
     let boxed_body = Box::new(Node::Block(body));
 
-    Ok((
-        input,
-        Node::While(Box::new(condition), boxed_body)
-    ))
+    Ok((input, Node::While(Box::new(condition), boxed_body)))
+}
+
+fn skip_tag(input: &[u8], skipable_tag: String) -> IResult<&[u8], ()> {
+    let (input, _) = space(input)?;
+    let (input, _) = tag(skipable_tag.as_bytes())(input)?;
+    let (input, _) = space(input)?;
+    Ok((input, ()))
 }
 
 fn for_ident(input: &[u8]) -> IResult<&[u8], Node> {
-    let (input, _) = space(input)?;
-    let (input, _) = tag("for")(input)?;
-    let (input, _) = space(input)?;
+    let (input, _) = skip_tag(input, "for".to_string())?;
     let (input, init) = statement(input)?;
-    let (input, _) = space(input)?;
-    let (input, _) = tag(";")(input)?;
-    let (input, _) = space(input)?;
+    let (input, _) = skip_tag(input, ";".to_string())?;
     let (input, condition) = statement(input)?;
-    let (input, _) = space(input)?;
-    let (input, _) = tag(";")(input)?;
-    let (input, _) = space(input)?;
+    let (input, _) = skip_tag(input, ";".to_string())?;
     let (input, step) = statement(input)?;
     let (input, _) = space(input)?;
 
     let (input, body) = body(input)?;
-    let (input, _) = space(input)?;
-    let (input, _) = tag("}")(input)?;
+    let (input, _) = skip_tag(input, "}".to_string())?;
     let boxed_body = Box::new(Node::Block(body));
 
     Ok((
         input,
-        Node::For(Box::new(init), Box::new(condition), boxed_body, Box::new(step))
+        Node::For(
+            Box::new(init),
+            Box::new(condition),
+            boxed_body,
+            Box::new(step),
+        ),
     ))
 }
 // Backus-Naur Form of math expression
@@ -340,7 +326,14 @@ fn for_ident(input: &[u8]) -> IResult<&[u8], Node> {
 // Number ::= Digit+
 
 pub fn statement(input: &[u8]) -> IResult<&[u8], Node> {
-    alt((function, while_ident, for_ident, if_else, assignment, expression))(input)
+    alt((
+        function,
+        while_ident,
+        for_ident,
+        if_else,
+        assignment,
+        expression,
+    ))(input)
 }
 
 fn assignment(input: &[u8]) -> IResult<&[u8], Node> {
@@ -379,5 +372,19 @@ mod tests {
     #[test]
     fn expression_with_brackets() {
         assert_eq!(5.0, eval("3+4*(6.5-6)").unwrap());
+    }
+
+    #[test]
+    fn fibonnaci_function() {
+        let (_, parsed) = statement(
+            "fn fib(a) { if a == 0 { 0; } else { if a == 1 { 1; } else { fib(a-1) + fib(a-2); }; }; }"
+            .as_bytes())
+            .map_err(|err| format!("{:?}", err))
+            .unwrap();
+        let mut context = Context::default();
+        let value = parsed.evaluate(&mut context).unwrap();
+        let (_, parsed) = statement("fib(10)".as_bytes()).unwrap();
+        let value = parsed.evaluate(&mut context).unwrap();
+        assert_eq!(value.to_number().unwrap(), 55.0)
     }
 }
